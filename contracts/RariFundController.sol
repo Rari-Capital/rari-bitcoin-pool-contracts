@@ -19,12 +19,10 @@ import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20
 import "@0x/contracts-exchange-libs/contracts/src/LibOrder.sol";
 
 import "./RariFundManager.sol";
-import "./lib/pools/DydxPoolController.sol";
 import "./lib/pools/CompoundPoolController.sol";
 import "./lib/pools/AavePoolController.sol";
-import "./lib/pools/MStablePoolController.sol";
+import "./lib/pools/AaveV2PoolController.sol";
 import "./lib/exchanges/ZeroExExchangeController.sol";
-import "./lib/exchanges/MStableExchangeController.sol";
 
 /**
  * @title RariFundController
@@ -84,7 +82,7 @@ contract RariFundController is Ownable {
     /**
      * @dev Enum for liqudity pools supported by Rari.
      */
-    enum LiquidityPool { dYdX, Compound, Aave, mStable }
+    enum LiquidityPool { Compound, Aave, AaveV2 }
 
     /**
      * @dev Maps currency codes to arrays of supported pools.
@@ -99,25 +97,10 @@ contract RariFundController is Ownable {
         Ownable.initialize(msg.sender);
         
         // Add supported currencies
-        addSupportedCurrency("DAI", 0x6B175474E89094C44Da98b954EedeAC495271d0F, 18);
-        addPoolToCurrency("DAI", LiquidityPool.dYdX);
-        addPoolToCurrency("DAI", LiquidityPool.Compound);
-        addPoolToCurrency("DAI", LiquidityPool.Aave);
-        addSupportedCurrency("USDC", 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 6);
-        addPoolToCurrency("USDC", LiquidityPool.dYdX);
-        addPoolToCurrency("USDC", LiquidityPool.Compound);
-        addPoolToCurrency("USDC", LiquidityPool.Aave);
-        addSupportedCurrency("USDT", 0xdAC17F958D2ee523a2206206994597C13D831ec7, 6);
-        addPoolToCurrency("USDT", LiquidityPool.Compound);
-        addPoolToCurrency("USDT", LiquidityPool.Aave);
-        addSupportedCurrency("TUSD", 0x0000000000085d4780B73119b644AE5ecd22b376, 18);
-        addPoolToCurrency("TUSD", LiquidityPool.Aave);
-        addSupportedCurrency("BUSD", 0x4Fabb145d64652a948d72533023f6E7A623C7C53, 18);
-        addPoolToCurrency("BUSD", LiquidityPool.Aave);
-        addSupportedCurrency("sUSD", 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51, 18);
-        addPoolToCurrency("sUSD", LiquidityPool.Aave);
-        addSupportedCurrency("mUSD", 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5, 18);
-        addPoolToCurrency("mUSD", LiquidityPool.mStable);
+        addSupportedCurrency("WBTC", 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599, 8);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.Compound);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.Aave);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.AaveV2);
     }
 
     /**
@@ -280,14 +263,6 @@ contract RariFundController is Ownable {
     }
 
     /**
-     * @dev Returns the balances of all currencies supported by dYdX.
-     * @return An array of ERC20 token contract addresses and a corresponding array of balances.
-     */
-    function getDydxBalances() external view returns (address[] memory, uint256[] memory) {
-        return DydxPoolController.getBalances();
-    }
-
-    /**
      * @dev Returns the fund controller's balance of the specified currency in the specified pool (without checking `_poolsWithFunds` first).
      * @dev Ideally, we can add the `view` modifier, but Compound's `getUnderlyingBalance` function (called by `CompoundPoolController.getBalance`) potentially modifies the state.
      * @param pool The index of the pool.
@@ -296,10 +271,9 @@ contract RariFundController is Ownable {
     function _getPoolBalance(LiquidityPool pool, string memory currencyCode) public returns (uint256) {
         address erc20Contract = _erc20Contracts[currencyCode];
         require(erc20Contract != address(0), "Invalid currency code.");
-        if (pool == LiquidityPool.dYdX) return DydxPoolController.getBalance(erc20Contract);
-        else if (pool == LiquidityPool.Compound) return CompoundPoolController.getBalance(erc20Contract);
+        if (pool == LiquidityPool.Compound) return CompoundPoolController.getBalance(erc20Contract);
         else if (pool == LiquidityPool.Aave) return AavePoolController.getBalance(erc20Contract);
-        else if (pool == LiquidityPool.mStable && erc20Contract == 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5) return MStablePoolController.getBalance();
+        else if (pool == LiquidityPool.AaveV2) return AaveV2PoolController.getBalance(erc20Contract);
         else revert("Invalid pool index.");
     }
 
@@ -324,10 +298,9 @@ contract RariFundController is Ownable {
     function approveToPool(LiquidityPool pool, string calldata currencyCode, uint256 amount) external fundEnabled onlyRebalancer {
         address erc20Contract = _erc20Contracts[currencyCode];
         require(erc20Contract != address(0), "Invalid currency code.");
-        if (pool == LiquidityPool.dYdX) DydxPoolController.approve(erc20Contract, amount);
-        else if (pool == LiquidityPool.Compound) CompoundPoolController.approve(erc20Contract, amount);
+        if (pool == LiquidityPool.Compound) CompoundPoolController.approve(erc20Contract, amount);
         else if (pool == LiquidityPool.Aave) AavePoolController.approve(erc20Contract, amount);
-        else if (pool == LiquidityPool.mStable && erc20Contract == 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5) return MStablePoolController.approve(amount);
+        else if (pool == LiquidityPool.AaveV2) AavePoolControllerV2.approve(erc20Contract, amount);
         else revert("Invalid pool index.");
     }
 
@@ -378,10 +351,9 @@ contract RariFundController is Ownable {
     function depositToPool(LiquidityPool pool, string calldata currencyCode, uint256 amount) external fundEnabled onlyRebalancer {
         address erc20Contract = _erc20Contracts[currencyCode];
         require(erc20Contract != address(0), "Invalid currency code.");
-        if (pool == LiquidityPool.dYdX) DydxPoolController.deposit(erc20Contract, amount);
-        else if (pool == LiquidityPool.Compound) CompoundPoolController.deposit(erc20Contract, amount);
+        if (pool == LiquidityPool.Compound) CompoundPoolController.deposit(erc20Contract, amount);
         else if (pool == LiquidityPool.Aave) AavePoolController.deposit(erc20Contract, amount, _aaveReferralCode);
-        else if (pool == LiquidityPool.mStable && erc20Contract == 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5) MStablePoolController.deposit(amount);
+        else if (pool == LiquidityPool.AaveV2) AaveV2PoolController.deposit(erc20Contract, amount, _aaveReferralCode);
         else revert("Invalid pool index.");
         _poolsWithFunds[currencyCode][uint8(pool)] = true;
         emit PoolAllocation(PoolAllocationAction.Deposit, pool, currencyCode, amount);
@@ -396,10 +368,9 @@ contract RariFundController is Ownable {
     function _withdrawFromPool(LiquidityPool pool, string memory currencyCode, uint256 amount) internal {
         address erc20Contract = _erc20Contracts[currencyCode];
         require(erc20Contract != address(0), "Invalid currency code.");
-        if (pool == LiquidityPool.dYdX) DydxPoolController.withdraw(erc20Contract, amount);
-        else if (pool == LiquidityPool.Compound) CompoundPoolController.withdraw(erc20Contract, amount);
+        if (pool == LiquidityPool.Compound) CompoundPoolController.withdraw(erc20Contract, amount);
         else if (pool == LiquidityPool.Aave) AavePoolController.withdraw(erc20Contract, amount);
-        else if (pool == LiquidityPool.mStable && erc20Contract == 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5) MStablePoolController.withdraw(amount);
+        else if (pool == LiquidityPool.AaveV2) AaveV2PoolController.withdraw(erc20Contract, amount);
         else revert("Invalid pool index.");
         emit PoolAllocation(PoolAllocationAction.Withdraw, pool, currencyCode, amount);
     }
@@ -426,7 +397,7 @@ contract RariFundController is Ownable {
      * @param all Boolean indicating if all funds are being withdrawn.
      */
     function withdrawFromPoolOptimized(LiquidityPool pool, string calldata currencyCode, uint256 amount, bool all) external fundEnabled onlyManager {
-        all && (pool == LiquidityPool.dYdX || pool == LiquidityPool.mStable) ? _withdrawAllFromPool(pool, currencyCode) : _withdrawFromPool(pool, currencyCode, amount);
+        _withdrawFromPool(pool, currencyCode, amount);
         if (all) _poolsWithFunds[currencyCode][uint8(pool)] = false;
     }
 
@@ -438,10 +409,9 @@ contract RariFundController is Ownable {
     function _withdrawAllFromPool(LiquidityPool pool, string memory currencyCode) internal {
         address erc20Contract = _erc20Contracts[currencyCode];
         require(erc20Contract != address(0), "Invalid currency code.");
-        if (pool == LiquidityPool.dYdX) DydxPoolController.withdrawAll(erc20Contract);
-        else if (pool == LiquidityPool.Compound) require(CompoundPoolController.withdrawAll(erc20Contract), "No Compound balance to withdraw from.");
+        if (pool == LiquidityPool.Compound) require(CompoundPoolController.withdrawAll(erc20Contract), "No Compound balance to withdraw from.");
         else if (pool == LiquidityPool.Aave) require(AavePoolController.withdrawAll(erc20Contract), "No Aave balance to withdraw from.");
-        else if (pool == LiquidityPool.mStable && erc20Contract == 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5) require(MStablePoolController.withdrawAll(), "No mStable balance to withdraw from.");
+        else if (pool == LiquidityPool.AaveV2) require(AaveV2PoolController.withdrawAll(erc20Contract), "No Aave V2 balance to withdraw from.");
         else revert("Invalid pool index.");
         _poolsWithFunds[currencyCode][uint8(pool)] = false;
         emit PoolAllocation(PoolAllocationAction.WithdrawAll, pool, currencyCode, 0);

@@ -1,7 +1,7 @@
 {
-  "name": "rari-stable-pool-contracts",
-  "version": "2.4.1",
-  "description": "Smart contracts for the Rari Stable Pool.",
+  "name": "rari-bitcoin-pool-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for the Rari Bitcoin Pool.",
   "main": "truffle-config.js",
   "directories": {
     "test": "test"
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Rari-Capital/rari-stable-pool-contracts.git"
+    "url": "https://github.com/Rari-Capital/rari-bitcoin-pool-contracts.git"
   },
   "author": {
     "name": "David Lucid",
@@ -23,9 +23,9 @@
   },
   "license": "SEE LICENSE IN LICENSE",
   "bugs": {
-    "url": "https://github.com/Rari-Capital/rari-stable-pool-contracts/issues"
+    "url": "https://github.com/Rari-Capital/rari-bitcoin-pool-contracts/issues"
   },
-  "homepage": "https://github.com/Rari-Capital/rari-stable-pool-contracts#readme",
+  "homepage": "https://github.com/Rari-Capital/rari-bitcoin-pool-contracts#readme",
   "devDependencies": {
     "@openzeppelin/truffle-upgrades": "^1.1.0",
     "@truffle/hdwallet-provider": "^1.0.36",

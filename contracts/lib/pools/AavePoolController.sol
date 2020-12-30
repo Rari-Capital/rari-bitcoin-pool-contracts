@@ -9,7 +9,7 @@
 
 pragma solidity 0.5.17;
 
-import "@openzeppelin/contracts-ethereum-package/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20.sol";
 
 import "../../external/aave/LendingPool.sol";
@@ -18,10 +18,9 @@ import "../../external/aave/AToken.sol";
 /**
  * @title AavePoolController
  * @author David Lucid <david@rari.capital> (https://github.com/davidlucid)
- * @dev This library handles deposits to and withdrawals from Aave liquidity pools.
+ * @dev This library handles deposits to and withdrawals from Aave V1 liquidity pools.
  */
 library AavePoolController {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     /**
@@ -44,12 +43,7 @@ library AavePoolController {
      * @param erc20Contract The ERC20 contract address of the token.
      */
     function getATokenContract(address erc20Contract) private pure returns (address) {
-        if (erc20Contract == 0x6B175474E89094C44Da98b954EedeAC495271d0F) return 0xfC1E690f61EFd961294b3e1Ce3313fBD8aa4f85d; // DAI => aDAI
-        if (erc20Contract == 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48) return 0x9bA00D6856a4eDF4665BcA2C2309936572473B7E; // USDC => aUSDC
-        if (erc20Contract == 0xdAC17F958D2ee523a2206206994597C13D831ec7) return 0x71fc860F7D3A592A4a98740e39dB31d25db65ae8; // USDT => aUSDT
-        if (erc20Contract == 0x0000000000085d4780B73119b644AE5ecd22b376) return 0x4DA9b813057D04BAef4e5800E36083717b4a0341; // TUSD => aTUSD
-        if (erc20Contract == 0x4Fabb145d64652a948d72533023f6E7A623C7C53) return 0x6Ee0f7BB50a54AB5253dA0667B0Dc2ee526C30a8; // BUSD => aBUSD
-        if (erc20Contract == 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51) return 0x625aE63000f46200499120B906716420bd059240; // sUSD => aSUSD
+        if (erc20Contract == 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599) return 0xFC4B8ED459e00e5400be803A9BB3954234FD50e3; // WBTC => aWBTC
         else revert("Supported Aave aToken address not found for this token address.");
     }
 

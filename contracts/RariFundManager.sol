@@ -109,25 +109,10 @@ contract RariFundManager is Initializable, Ownable {
         Ownable.initialize(msg.sender);
         
         // Add supported currencies
-        addSupportedCurrency("DAI", 0x6B175474E89094C44Da98b954EedeAC495271d0F, 18);
-        addPoolToCurrency("DAI", RariFundController.LiquidityPool.dYdX);
-        addPoolToCurrency("DAI", RariFundController.LiquidityPool.Compound);
-        addPoolToCurrency("DAI", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("USDC", 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 6);
-        addPoolToCurrency("USDC", RariFundController.LiquidityPool.dYdX);
-        addPoolToCurrency("USDC", RariFundController.LiquidityPool.Compound);
-        addPoolToCurrency("USDC", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("USDT", 0xdAC17F958D2ee523a2206206994597C13D831ec7, 6);
-        addPoolToCurrency("USDT", RariFundController.LiquidityPool.Compound);
-        addPoolToCurrency("USDT", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("TUSD", 0x0000000000085d4780B73119b644AE5ecd22b376, 18);
-        addPoolToCurrency("TUSD", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("BUSD", 0x4Fabb145d64652a948d72533023f6E7A623C7C53, 18);
-        addPoolToCurrency("BUSD", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("sUSD", 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51, 18);
-        addPoolToCurrency("sUSD", RariFundController.LiquidityPool.Aave);
-        addSupportedCurrency("mUSD", 0xe2f2a5C287993345a840Db3B0845fbC70f5935a5, 18);
-        addPoolToCurrency("mUSD", RariFundController.LiquidityPool.mStable);
+        addSupportedCurrency("WBTC", 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599, 8);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.Compound);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.Aave);
+        addPoolToCurrency("WBTC", RariFundController.LiquidityPool.AaveV2);
 
         // Initialize raw fund balance cache (can't set initial values in field declarations with proxy storage)
         _rawFundBalanceCache = -1;
@@ -363,24 +348,9 @@ contract RariFundManager is Initializable, Ownable {
     bool _cachePoolBalances;
 
     /**
-     * @dev Boolean indicating if dYdX balances returned by `getPoolBalance` are to be cached.
-     */
-    bool _cacheDydxBalances;
-
-    /**
      * @dev Maps to currency codes to cached pool balances to pool indexes.
      */
     mapping(string => mapping(uint8 => uint256)) _poolBalanceCache;
-
-    /**
-     * @dev Cached array of dYdX token addresses.
-     */
-    address[] private _dydxTokenAddressesCache;
-
-    /**
-     * @dev Cached array of dYdX balances.
-     */
-    uint256[] private _dydxBalancesCache;
 
     /**
      * @dev Returns the fund controller's balance of the specified currency in the specified pool.
@@ -391,35 +361,13 @@ contract RariFundManager is Initializable, Ownable {
     function getPoolBalance(RariFundController.LiquidityPool pool, string memory currencyCode) internal returns (uint256) {
         if (!rariFundController.hasCurrencyInPool(pool, currencyCode)) return 0;
 
-        if (_cachePoolBalances || _cacheDydxBalances) {
-            if (pool == RariFundController.LiquidityPool.dYdX) {
-                address erc20Contract = _erc20Contracts[currencyCode];
-                require(erc20Contract != address(0), "Invalid currency code.");
-                if (_dydxBalancesCache.length == 0) (_dydxTokenAddressesCache, _dydxBalancesCache) = rariFundController.getDydxBalances();
-                for (uint256 i = 0; i < _dydxBalancesCache.length; i++) if (_dydxTokenAddressesCache[i] == erc20Contract) return _dydxBalancesCache[i];
-                revert("Failed to get dYdX balance of this currency code.");
-            } else if (_cachePoolBalances) {
-                uint8 poolAsUint8 = uint8(pool);
-                if (_poolBalanceCache[currencyCode][poolAsUint8] == 0) _poolBalanceCache[currencyCode][poolAsUint8] = rariFundController._getPoolBalance(pool, currencyCode);
-                return _poolBalanceCache[currencyCode][poolAsUint8];
-            }
+        if (_cachePoolBalances) {
+            uint8 poolAsUint8 = uint8(pool);
+            if (_poolBalanceCache[currencyCode][poolAsUint8] == 0) _poolBalanceCache[currencyCode][poolAsUint8] = rariFundController._getPoolBalance(pool, currencyCode);
+            return _poolBalanceCache[currencyCode][poolAsUint8];
         }
 
         return rariFundController._getPoolBalance(pool, currencyCode);
-    }
-
-    /**
-     * @dev Caches dYdX pool balances returned by `getPoolBalance` for the duration of the function.
-     */
-    modifier cacheDydxBalances() {
-        bool cacheSetPreviously = _cacheDydxBalances;
-        _cacheDydxBalances = true;
-        _;
-
-        if (!cacheSetPreviously) {
-            _cacheDydxBalances = false;
-            if (!_cachePoolBalances) _dydxBalancesCache.length = 0;
-        }
     }
 
     /**
@@ -432,7 +380,6 @@ contract RariFundManager is Initializable, Ownable {
 
         if (!cacheSetPreviously) {
             _cachePoolBalances = false;
-            if (!_cacheDydxBalances) _dydxBalancesCache.length = 0;
 
             for (uint256 i = 0; i < _supportedCurrencies.length; i++) {
                 string memory currencyCode = _supportedCurrencies[i];
@@ -479,7 +426,7 @@ contract RariFundManager is Initializable, Ownable {
      * Accepts prices in USD as a parameter to avoid calculating them every time.
      * Ideally, we can add the `view` modifier, but Compound's `getUnderlyingBalance` function (called by `getRawFundBalance`) potentially modifies the state.
      */
-    function getRawFundBalance(uint256[] memory pricesInUsd) public cacheDydxBalances returns (uint256) {
+    function getRawFundBalance(uint256[] memory pricesInUsd) public returns (uint256) {
         uint256 totalBalance = 0;
 
         for (uint256 i = 0; i < _supportedCurrencies.length; i++) {
@@ -685,11 +632,7 @@ contract RariFundManager is Initializable, Ownable {
             bool withdrawAll = amountLeft >= poolBalance;
             uint256 poolAmount = withdrawAll ? poolBalance : amountLeft;
             rariFundController.withdrawFromPoolOptimized(pool, currencyCode, poolAmount, withdrawAll);
-
-            if (pool == RariFundController.LiquidityPool.dYdX) {
-                for (uint256 j = 0; j < _dydxBalancesCache.length; j++) if (_dydxTokenAddressesCache[j] == erc20Contract) _dydxBalancesCache[j] = poolBalance.sub(poolAmount);
-            } else _poolBalanceCache[currencyCode][uint8(pool)] = poolBalance.sub(poolAmount);
-
+            _poolBalanceCache[currencyCode][uint8(pool)] = poolBalance.sub(poolAmount);
             contractBalance = contractBalance.add(poolAmount);
         }
 

@@ -30,7 +30,7 @@ contract RariFundToken is Initializable, ERC20, ERC20Detailed, ERC20Mintable, ER
      * @dev Initializer for RariFundToken.
      */
     function initialize() public initializer {
-        ERC20Detailed.initialize("Rari Stable Pool Token", "RSPT", 18);
+        ERC20Detailed.initialize("Rari Bitcoin Pool Token", "RBPT", 18);
         ERC20Mintable.initialize(msg.sender);
     }
 

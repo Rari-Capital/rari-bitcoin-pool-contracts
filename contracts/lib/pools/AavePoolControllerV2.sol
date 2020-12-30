@@ -12,83 +12,90 @@ pragma solidity 0.5.17;
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-ethereum-package/contracts/token/ERC20/SafeERC20.sol";
 
-import "../../external/compound/CErc20.sol";
+import "../../external/aavev2/ILendingPool.sol";
+import "../../external/aave/AToken.sol";
 
 /**
- * @title CompoundPoolController
+ * @title AaveV2PoolController
  * @author David Lucid <david@rari.capital> (https://github.com/davidlucid)
- * @dev This library handles deposits to and withdrawals from dYdX liquidity pools.
+ * @dev This library handles deposits to and withdrawals from Aave V2 liquidity pools.
  */
-library CompoundPoolController {
+library AaveV2PoolController {
     using SafeERC20 for IERC20;
 
     /**
-     * @dev Returns a token's cToken contract address given its ERC20 contract address.
+     * @dev Aave LendingPool contract address.
+     */
+    address constant private LENDING_POOL_CONTRACT = 0x398eC7346DcD622eDc5ae82352F02bE94C62d119;
+
+    /**
+     * @dev Aave LendingPool contract object.
+     */
+    ILendingPool constant private _lendingPool = ILendingPool(LENDING_POOL_CONTRACT);
+
+    /**
+     * @dev Returns a token's aToken contract address given its ERC20 contract address.
      * @param erc20Contract The ERC20 contract address of the token.
      */
-    function getCErc20Contract(address erc20Contract) private pure returns (address) {
-        if (erc20Contract == 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599) return 0xC11b1268C1A384e55C48c2391d8d480264A3A7F4; // WBTC => cWBTC
-        else revert("Supported Compound cToken address not found for this token address.");
+    function getATokenContract(address erc20Contract) private pure returns (address) {
+        if (erc20Contract == 0x2260fac5e5542a773aa44fbcfedf7c193bc2c599) return 0x9ff58f4fFB29fA2266Ab25e75e2A8b3503311656; // WBTC => aWBTC
+        else revert("Supported Aave aToken address not found for this token address.");
     }
 
     /**
-     * @dev Returns the fund's balance of the specified currency in the Compound pool.
+     * @dev Returns the fund's balance of the specified currency in the Aave pool.
      * @param erc20Contract The ERC20 contract address of the token.
      */
-    function getBalance(address erc20Contract) external returns (uint256) {
-        return CErc20(getCErc20Contract(erc20Contract)).balanceOfUnderlying(address(this));
+    function getBalance(address erc20Contract) external view returns (uint256) {
+        AToken aToken = AToken(getATokenContract(erc20Contract));
+        return aToken.balanceOf(address(this));
     }
 
     /**
-     * @dev Approves tokens to Compound without spending gas on every deposit.
+     * @dev Approves tokens to Aave without spending gas on every deposit.
      * @param erc20Contract The ERC20 contract address of the token.
-     * @param amount Amount of the specified token to approve to Compound.
+     * @param amount Amount of the specified token to approve to Aave.
      */
     function approve(address erc20Contract, uint256 amount) external {
-        address cErc20Contract = getCErc20Contract(erc20Contract);
         IERC20 token = IERC20(erc20Contract);
-        uint256 allowance = token.allowance(address(this), cErc20Contract);
+        uint256 allowance = token.allowance(address(this), LENDING_POOL_CONTRACT);
         if (allowance == amount) return;
-        if (amount > 0 && allowance > 0) token.safeApprove(cErc20Contract, 0);
-        token.safeApprove(cErc20Contract, amount);
+        if (amount > 0 && allowance > 0) token.safeApprove(LENDING_POOL_CONTRACT, 0);
+        token.safeApprove(LENDING_POOL_CONTRACT, amount);
         return;
     }
 
     /**
-     * @dev Deposits funds to the Compound pool. Assumes that you have already approved >= the amount to Compound.
+     * @dev Deposits funds to the Aave pool. Assumes that you have already approved >= the amount to Aave.
      * @param erc20Contract The ERC20 contract address of the token to be deposited.
      * @param amount The amount of tokens to be deposited.
+     * @param referralCode Referral code.
      */
-    function deposit(address erc20Contract, uint256 amount) external {
+    function deposit(address erc20Contract, uint256 amount, uint16 referralCode) external {
         require(amount > 0, "Amount must be greater than 0.");
-        CErc20 cErc20 = CErc20(getCErc20Contract(erc20Contract));
-        uint256 mintResult = cErc20.mint(amount);
-        require(mintResult == 0, "Error calling mint on Compound cToken: error code not equal to 0.");
+        _lendingPool.deposit(erc20Contract, amount, address(this), referralCode);
     }
 
     /**
-     * @dev Withdraws funds from the Compound pool.
+     * @dev Withdraws funds from the Aave pool.
      * @param erc20Contract The ERC20 contract address of the token to be withdrawn.
      * @param amount The amount of tokens to be withdrawn.
      */
     function withdraw(address erc20Contract, uint256 amount) external {
         require(amount > 0, "Amount must be greater than 0.");
-        CErc20 cErc20 = CErc20(getCErc20Contract(erc20Contract));
-        uint256 redeemResult = cErc20.redeemUnderlying(amount);
-        require(redeemResult == 0, "Error calling redeemUnderlying on Compound cToken: error code not equal to 0.");
+        _lendingPool.withdraw(erc20Contract, amount, address(this));
     }
 
     /**
-     * @dev Withdraws all funds from the Compound pool.
+     * @dev Withdraws all funds from the Aave pool.
      * @param erc20Contract The ERC20 contract address of the token to be withdrawn.
      * @return Boolean indicating success.
      */
     function withdrawAll(address erc20Contract) external returns (bool) {
-        CErc20 cErc20 = CErc20(getCErc20Contract(erc20Contract));
-        uint256 balance = cErc20.balanceOf(address(this));
+        AToken aToken = AToken(getATokenContract(erc20Contract));
+        uint256 balance = aToken.balanceOf(address(this));
         if (balance <= 0) return false;
-        uint256 redeemResult = cErc20.redeem(balance);
-        require(redeemResult == 0, "Error calling redeem on Compound cToken: error code not equal to 0.");
+        _lendingPool.withdraw(erc20Contract, balance, address(this));
         return true;
     }
 }

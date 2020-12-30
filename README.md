@@ -51,7 +51,6 @@ If you'd like to test gasless deposits via `RariFundProxy.deposit` via the Gas S
 * Making sure `npx` is installed, run `npm dev-gsn`.
 * Fund `RariFundProxy` using `npx @openzeppelin/gsn-helpers fund-recipient --recipient $RARI_FUND_PROXY_ADDRESS -n http://localhost:8546 -f $FROM_ADDRESS` or [this tool](https://www.opengsn.org/recipients) (or manually send ETH to `RelayHub(0xD216153c06E857cD7f72665E0aF1d7D82172F494).depositFor(address target)`).
 * Run `rari-gsn-signer` with `pm2 start ecosystem.config.js` after configuring `ecosystem.config.js`.
-* *Please note that as of now, the web client and the GSN signer are configured so that gas is paid only for deposits of least 250 DAI/USDC/USDT by first-time users.*
 
 ## Live deployment
 
@@ -70,7 +69,6 @@ If you'd like to provide gasless deposits via `RariFundProxy.deposit` via the Ga
 
 * Fund `RariFundProxy` using `npx @openzeppelin/gsn-helpers fund-recipient --recipient $RARI_FUND_PROXY_ADDRESS -n $ETHEREUM_NODE_URL -f $FROM_ADDRESS` or [this tool](https://www.opengsn.org/recipients) (or manually send ETH to `RelayHub(0xD216153c06E857cD7f72665E0aF1d7D82172F494).depositFor(address target)`).
 * Run `rari-gsn-signer` with `pm2 start ecosystem.config.js --env production` after configuring `ecosystem.config.js`.
-* *Please note that as of now, the web client and the GSN signer are configured so that gas is paid only for deposits of least 250 DAI/USDC/USDT by first-time users.*
 
 ## License
 
